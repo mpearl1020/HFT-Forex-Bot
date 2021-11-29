@@ -7,6 +7,6 @@
 
 using namespace std;
 
-void execute_trade(ofstream log, std::vector<std::string> trade_sequence);
+void execute_trade(std::vector<std::string> trade_sequence);
 
 #endif
