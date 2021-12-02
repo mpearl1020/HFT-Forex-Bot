@@ -15,6 +15,9 @@ std::unordered_map<std::string, float> read_data_from_file(string file_path);
 graph construct_initial_graph(std::unordered_map<std::string, float>);
 
 // alter data so it works with the Bellman Ford Algorithm
-void prepare_for_bf(graph initial_graph);
+graph prepare_for_bf(graph initial_graph);
+
+// random imputations to simulate arbitrage opportunities appearing
+graph random_data_imputations(graph exchange_graph);
 
 #endif
