@@ -48,7 +48,6 @@ std::unordered_map<std::string, float> read_data_from_file(string file_path) {
         
     }
 
-    // FIGURE OUT SEG FAULT -> OCCURRING AFTER FOR LOOP
     return processed_data;
 }
 
