@@ -9,30 +9,40 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <mutex>
 #include <unordered_set>
 #include <unordered_map>
 #include <iomanip>
 #include <algorithm>
 
-
 using namespace std;
+
+auto lock() {
+    static std::mutex m;
+    return std::unique_lock<decltype(m)>(m);
+}
 
 void impute(graph exchange_graph) {
     while (true) {
+        using namespace std::literals;
         std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-        exchange_graph = random_data_imputations(exchange_graph);
+        {
+            auto l = lock();
+            exchange_graph = random_data_imputations(exchange_graph);
+        }
     }
 }
 
 void trading_thread(graph exchange_graph, std::vector<std::string> currency_vector, std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities, std::unordered_set<std::string> currencies_in_arbitrage, std::unordered_set<std::string> portfolio_currencies, std::unordered_map<std::string, float> portfolio) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    execute_trade(exchange_graph, currency_vector, all_arbitrage_opportunities, currencies_in_arbitrage, portfolio_currencies, portfolio);
-}
-
-void logger(std::unordered_map<std::string, float> portfolio) {
     while (true) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-        log_portfolio(portfolio);
+        using namespace std::literals;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        {
+            auto l = lock();
+            exchange_graph = random_data_imputations(exchange_graph);
+            portfolio = execute_trade(exchange_graph, currency_vector, all_arbitrage_opportunities, currencies_in_arbitrage, portfolio_currencies, portfolio);
+            log_portfolio(portfolio);
+        }
     }
 }
 
@@ -63,7 +73,6 @@ int main() {
     float current_amount;
     std::string more_currencies;
 
-    // DO EXCEPTION HANDLING -> 0 OR NEGATIVE AMOUNTS, CORRECT TYPE, ETC.
     while (true) {
         if (exit) {
             break;
@@ -88,7 +97,7 @@ int main() {
         } else if (more_currencies == "Y") {
             continue;
         } else {
-            // ERROR CONDITION
+            throw std::invalid_argument("user did not select Y or N");
         }
         currency_counter++;
     }
@@ -99,33 +108,19 @@ int main() {
         portfolio_currencies.insert(ticker);
     }
 
-    std::thread log_thread(logger, portfolio);
-    log_thread.join();
-
     std::unordered_map<std::string, float> unformatted_data = read_data_from_file("exchange_rates.txt");
-    graph initial_exchange_graph = construct_initial_graph(unformatted_data); // always revert back to this
+    graph initial_exchange_graph = construct_initial_graph(unformatted_data);
     graph exchange_graph = construct_initial_graph(unformatted_data);
 
+    std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities;
+    std::unordered_set<std::string> currencies_in_arbitrage; 
+    
+    std::thread trade_thread(trading_thread, exchange_graph, currency_vector, all_arbitrage_opportunities, currencies_in_arbitrage, portfolio_currencies, portfolio);
+    
     std::thread impute_thread(impute, exchange_graph);
+
     impute_thread.join();
+    trade_thread.join();
 
-    // TRADING
-    while (true) {
-        std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities;
-        std::unordered_set<std::string> currencies_in_arbitrage; 
-        
-        std::thread trade_thread(trading_thread, exchange_graph, currency_vector, all_arbitrage_opportunities, currencies_in_arbitrage, portfolio_currencies, portfolio);
-        trade_thread.join();
-        
-        // PERFORM ARBITRAGE FOR 1 ms (SUBJECT TO CHANGE) -> REVERT BACK TO INITIAL GRAPH
-        exchange_graph = initial_exchange_graph;
-
-        // EVERY 1 s -> RANDOM IMPUTATIONS
-    }
-
-    // OUTPUT SUMMARY OF PORTFOLIO
-
-    // START SCRAPING -> UPDATE EVERY 5 SECONDS
-
-    // OUTPUT FINAL RETURNS ON EXIT
+    return 0;
 }

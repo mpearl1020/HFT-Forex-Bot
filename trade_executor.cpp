@@ -2,16 +2,22 @@
 #include "graph.hpp"
 #include "data_preprocessing.hpp"
 #include "bellman_ford.hpp"
+#include "trade_logger.hpp"
 
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <iostream>
+#include <ctime>
+#include <chrono>
+#include <cmath>
 
 using namespace std;
 
-void execute_trade(graph exchange_graph, std::vector<std::string> currency_vector, std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities, std::unordered_set<std::string> currencies_in_arbitrage, std::unordered_set<std::string> portfolio_currencies, std::unordered_map<std::string, float> portfolio) {
+std::unordered_map<std::string, float> execute_trade(graph exchange_graph, std::vector<std::string> currency_vector, std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities, std::unordered_set<std::string> currencies_in_arbitrage, std::unordered_set<std::string> portfolio_currencies, std::unordered_map<std::string, float> portfolio) {
     std::vector<std::string> trading_sequence;
+
     for (auto ticker : currency_vector) {
         trading_sequence = bellman_ford(prepare_for_bf(exchange_graph), ticker);
         all_arbitrage_opportunities[ticker] = trading_sequence;
@@ -19,6 +25,8 @@ void execute_trade(graph exchange_graph, std::vector<std::string> currency_vecto
             currencies_in_arbitrage.insert(t);
         }
     }
+
+    log_trade(trading_sequence);
 
     std::vector<std::string> intersection;
 
@@ -35,33 +43,39 @@ void execute_trade(graph exchange_graph, std::vector<std::string> currency_vecto
             ++iter;
         }
         starting_currency = *iter;
-    } else {
-        // IF NOT PICK A RANDOM ONE THAT WE HAVE, BUY A RANDOM ONE IN THE ARBITRAGE AND PROCEED
-        // COULD SIMPLIFY
-    }
+    } 
 
     std::unordered_map<std::string, std::unordered_map<std::string, float>> adjMap = exchange_graph.adjMap;
 
-    // pick starting currency and start trading
-    while (true) {
-        int i;
-        std::string ticker_1;
-        std::string ticker_2;
-        for (i = 0; i < trading_sequence.size() - 1; i++) {
-            ticker_1 = trading_sequence[i];
-            ticker_2 = trading_sequence[i+1];
-            float exchange_rate = adjMap[ticker_1][ticker_2];
-            portfolio[ticker_1] = 0; // use all of currency 1
-            portfolio[ticker_2] += (portfolio[ticker_1] * exchange_rate);
-        }
-        float final_exchange_rate = adjMap[trading_sequence[trading_sequence.size() - 1]][trading_sequence[0]];
-        portfolio[trading_sequence[trading_sequence.size() - 1]] = 0;
-        portfolio[trading_sequence[0]] += (portfolio[trading_sequence[trading_sequence.size() - 1]] * final_exchange_rate);
-        i = 0;
+    std::chrono::steady_clock::time_point init_time = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point curr;
+
+    int count = 0;
+
+    while (std::chrono::duration_cast<std::chrono::microseconds>(curr - init_time).count() < 1000) {
+        cout << count << endl;
+        curr = std::chrono::steady_clock::now();
+        
+        for (int i = 0; i < trading_sequence.size(); i++) {}
+        count++;
     }
 
-}
+    std::string ticker_1;
+    std::string ticker_2;
+    
+    float multiplier = 1;
+    for (int i = 0; i < trading_sequence.size() - 1; i++) {
+        ticker_1 = trading_sequence[i];
+        ticker_2 = trading_sequence[i+1];
+        float exchange_rate = adjMap[ticker_1][ticker_2];
 
-std::unordered_map<std::string, float> execute_trade_threading_enabled() {
+        multiplier *= exchange_rate;
+    }
 
+    float final_exchange_rate = adjMap[trading_sequence[trading_sequence.size() - 1]][trading_sequence[0]];
+    multiplier *= final_exchange_rate;
+
+    portfolio[starting_currency] = (portfolio[starting_currency] * pow (multiplier, count));
+
+    return portfolio;
 }
