@@ -3,6 +3,7 @@
 #include "graph.hpp"
 #include "trade_logger.hpp"
 #include "trade_logger.hpp"
+#include "trade_executor.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -20,14 +21,18 @@ void impute(graph exchange_graph) {
     while (true) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5000));
         exchange_graph = random_data_imputations(exchange_graph);
-        cout << "impute thread run" << endl;
     }
 }
 
-void dumb_func() {
+void trading_thread(graph exchange_graph, std::vector<std::string> currency_vector, std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities, std::unordered_set<std::string> currencies_in_arbitrage, std::unordered_set<std::string> portfolio_currencies, std::unordered_map<std::string, float> portfolio) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    execute_trade(exchange_graph, currency_vector, all_arbitrage_opportunities, currencies_in_arbitrage, portfolio_currencies, portfolio);
+}
+
+void logger(std::unordered_map<std::string, float> portfolio) {
     while (true) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        cout << "dumb thread run" << endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        log_portfolio(portfolio);
     }
 }
 
@@ -47,9 +52,6 @@ int main() {
         "CAD", "AUD", "SGD", "BND", 
         "NZD", "BGN", "FJD", "BRL"
     };
-
-    // CONSTRUCT INTIAL DATA
-    // std::unordered_map<std::string, 
 
     std::unordered_map<std::string, float> portfolio;
 
@@ -97,63 +99,26 @@ int main() {
         portfolio_currencies.insert(ticker);
     }
 
-    log_portfolio(portfolio);
+    std::thread log_thread(logger, portfolio);
+    log_thread.join();
 
-    // INITIAL GRAPH CONSTRUCTION
     std::unordered_map<std::string, float> unformatted_data = read_data_from_file("exchange_rates.txt");
     graph initial_exchange_graph = construct_initial_graph(unformatted_data); // always revert back to this
     graph exchange_graph = construct_initial_graph(unformatted_data);
 
-    // std::thread t0(dumb_func);
-    std::thread t1(impute, exchange_graph); // MAKE WHOLE SIM TIME 60 s -> COMPARE THREADING VS. STANDARD RETURNS
-    // t0.join();
-    t1.join();
+    std::thread impute_thread(impute, exchange_graph);
+    impute_thread.join();
 
     // TRADING
     while (true) {
         std::unordered_map<std::string, std::vector<string>> all_arbitrage_opportunities;
         std::unordered_set<std::string> currencies_in_arbitrage; 
-        // RUN BF FROM EACH SOURCE -> NON-THREADED
-
-
-
-        // exchange_graph = random_data_imputations(exchange_graph); // DO EVERY SO OFTEN
-
         
-
-        for (auto ticker : currency_vector) {
-            // REMOVE DEFAULT ARBITRAGE IN GRAPH
-            std::vector<std::string> trading_sequence = bellman_ford(prepare_for_bf(exchange_graph), ticker);
-            all_arbitrage_opportunities[ticker] = trading_sequence;
-            for (auto t: trading_sequence) {
-                currencies_in_arbitrage.insert(t);
-            }
-        }
-
-        // CHECK IF WE HAVE ANY OF THE CURRENCIES -> curriencies_in_arbitrage and portfolio_currencies (CHECK THIS)
-        std::vector<std::string> intersection;
-
-        std::set_intersection(portfolio_currencies.begin(), portfolio_currencies.end(),
-                              currencies_in_arbitrage.begin(), currencies_in_arbitrage.end(),
-                              std::back_inserter(intersection));
+        std::thread trade_thread(trading_thread, exchange_graph, currency_vector, all_arbitrage_opportunities, currencies_in_arbitrage, portfolio_currencies, portfolio);
+        trade_thread.join();
         
-        std::string starting_currency;
-
-        if (intersection.size() > 0) {
-            // pick random currency from intersection
-            int r = rand() % intersection.size();
-            auto iter = intersection.begin();
-            while (r--) {
-                ++iter;
-            }
-            starting_currency = *iter;
-        } else {
-            // IF NOT PICK A RANDOM ONE THAT WE HAVE, BUY A RANDOM ONE IN THE ARBITRAGE AND PROCEED
-        }
-
-        
-
         // PERFORM ARBITRAGE FOR 1 ms (SUBJECT TO CHANGE) -> REVERT BACK TO INITIAL GRAPH
+        exchange_graph = initial_exchange_graph;
 
         // EVERY 1 s -> RANDOM IMPUTATIONS
     }

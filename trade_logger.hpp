@@ -10,6 +10,6 @@ using namespace std;
 
 void log_portfolio(std::unordered_map<std::string, float> portfolio);
 
-void execute_trade(std::vector<std::string> trade_sequence);
+void log_trade(std::vector<std::string> trade_sequence);
 
 #endif

@@ -23,7 +23,7 @@ void log_portfolio(std::unordered_map<std::string, float> portfolio) {
     return;
 }
 
-void execute_trade(std::vector<std::string> trade_sequence) {
+void log_trade(std::vector<std::string> trade_sequence) {
     auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     ofstream log;
     log.open("trade_log.txt", std::ios_base::app);
