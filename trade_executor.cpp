@@ -53,7 +53,6 @@ std::unordered_map<std::string, float> execute_trade(graph exchange_graph, std::
     int count = 0;
 
     while (std::chrono::duration_cast<std::chrono::microseconds>(curr - init_time).count() < 1000) {
-        cout << count << endl;
         curr = std::chrono::steady_clock::now();
         
         for (int i = 0; i < trading_sequence.size(); i++) {}
